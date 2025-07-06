@@ -29,3 +29,4 @@ go.work.sum
 .vscode/
 secrets.gob
 static/*
+auto2.exe

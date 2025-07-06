@@ -34,7 +34,7 @@ var port = flag.Int("port", defaultPort, "webserver listening port")
 var saveFilePath = flag.String("filepath", "secrets.gob", "Relative filepath to save encrypted secrets")
 var verboseApi = flag.Bool("verboseapi", false, "verbose API call info")
 var apiStart = flag.Int("apistart", defaultApiStart, "hour (24hr format) to start API calls")
-var apiEnd = flag.Int("apiend", defaultApiStart, "hour (24hr format) to end API calls")
+var apiEnd = flag.Int("apiend", defaultApiEnd, "hour (24hr format) to end API calls")
 
 func validateFlags() {
 	flag.Parse()

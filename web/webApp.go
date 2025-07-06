@@ -36,6 +36,7 @@ type serverParams struct {
 	apiEndHour   int
 }
 
+//go:embed templates/*.html
 var templateFS embed.FS
 
 // returns pointer to a properly initialized WebApp value
