@@ -24,20 +24,11 @@ type WebApp struct {
 	Tc           tickets.TicketCollection
 	wsClients    wsClients
 	serverParams serverParams
-	lastApiCheckMutex sync.RWMutex
-	lastApiCheckTime  time.Time
+	lastGoodApi  apiStatus
 }
 
-// adjustable parameters for webserver function
-type serverParams struct {
-	sync.RWMutex
-	pollRate     int
-	port         int
-	verboseApi   bool
-	apiStartHour int
-	apiEndHour   int
-}
-
+// embeds html files in compiled executable
+//
 //go:embed templates/*.html
 var templateFS embed.FS
 
@@ -94,7 +85,7 @@ func NewWebApp(
 // Starts serving clients and periodically polling API / updating websock clients
 func (w *WebApp) Start() {
 	go w.periodicallyPollApi()
-	go w.periodicStatusBroadcast() // NEW: broadcast status every 10 min
+	go w.periodicStatusBroadcast()
 	portStr := ":" + strconv.Itoa(w.serverParams.port)
 	if err := w.E.Start(portStr); err != nil {
 		fmt.Println("Error starting server:", err)
@@ -107,8 +98,7 @@ func (w *WebApp) periodicallyPollApi() {
 	defer ticker.Stop()
 
 	for range ticker.C {
-		currentHour := time.Now().Hour()
-		if currentHour < w.serverParams.apiStartHour || currentHour >= w.serverParams.apiEndHour {
+		if !w.serverParams.getActive() {
 			if w.serverParams.verboseApi {
 				timeStamp := time.Now().Format("15:04 Jan 2")
 				fmt.Printf(
@@ -137,9 +127,7 @@ func (w *WebApp) pollApi() error {
 		return err
 	}
 	// Set last successful API check time
-	w.lastApiCheckMutex.Lock()
-	w.lastApiCheckTime = time.Now()
-	w.lastApiCheckMutex.Unlock()
+	w.lastGoodApi.setGood()
 
 	if w.serverParams.verboseApi {
 		timeStamp := time.Now().Format("15:04 Jan 2")
@@ -168,6 +156,44 @@ func (w *WebApp) pollApi() error {
 
 //  helper types
 
+// adjustable parameters for webserver function
+type serverParams struct {
+	sync.RWMutex
+	pollRate     int
+	port         int
+	verboseApi   bool
+	apiStartHour int
+	apiEndHour   int
+}
+
+func (sp *serverParams) getActive() bool {
+	sp.RLock()
+	defer sp.RUnlock()
+	currentHour := time.Now().Hour()
+	return !(currentHour < sp.apiStartHour || currentHour >= sp.apiEndHour)
+
+}
+
+// mutex-protected timestamp of last good api call
+type apiStatus struct {
+	sync.RWMutex
+	time time.Time
+}
+
+// set the last good api time to now
+func (as *apiStatus) setGood() {
+	as.Lock()
+	defer as.Unlock()
+	as.time = time.Now()
+}
+
+// get time of last good api call
+func (as *apiStatus) getTime() time.Time {
+	as.RLock()
+	defer as.RUnlock()
+	return as.time
+}
+
 // used to handle secrets submitted by user
 type submittedSecrets struct {
 	Username        string `json:"username"`
@@ -187,9 +213,9 @@ func (t *Template) Render(w io.Writer, name string, data interface{}, c echo.Con
 
 // Status message struct for websocket broadcast
 type StatusMessage struct {
-	Type           string    `json:"type"`
-	LastApiCheck   string    `json:"lastApiCheck"`
-	ActiveHours    bool      `json:"activeHours"`
+	Type         string `json:"type"`
+	LastApiCheck string `json:"lastApiCheck"`
+	ActiveHours  bool   `json:"activeHours"`
 }
 
 // Broadcast status to all WebSocket clients every 10 minutes
@@ -201,18 +227,12 @@ func (w *WebApp) periodicStatusBroadcast() {
 		w.broadcastStatus()
 	}
 }
+
 func (w *WebApp) broadcastStatus() {
-	w.lastApiCheckMutex.RLock()
-	lastCheck := w.lastApiCheckTime
-	w.lastApiCheckMutex.RUnlock()
-	currentHour := time.Now().Hour()
-	w.serverParams.RLock()
-	active := currentHour >= w.serverParams.apiStartHour && currentHour < w.serverParams.apiEndHour
-	w.serverParams.RUnlock()
 	msg := StatusMessage{
 		Type:         "status",
-		LastApiCheck: lastCheck.Format(time.RFC3339),
-		ActiveHours:  active,
+		LastApiCheck: w.lastGoodApi.getTime().Format(time.RFC3339),
+		ActiveHours:  w.serverParams.getActive(),
 	}
 	w.wsClients.Lock()
 	defer w.wsClients.Unlock()
