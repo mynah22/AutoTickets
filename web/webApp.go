@@ -24,6 +24,8 @@ type WebApp struct {
 	Tc           tickets.TicketCollection
 	wsClients    wsClients
 	serverParams serverParams
+	lastApiCheckMutex sync.RWMutex
+	lastApiCheckTime  time.Time
 }
 
 // adjustable parameters for webserver function
@@ -92,6 +94,7 @@ func NewWebApp(
 // Starts serving clients and periodically polling API / updating websock clients
 func (w *WebApp) Start() {
 	go w.periodicallyPollApi()
+	go w.periodicStatusBroadcast() // NEW: broadcast status every 10 min
 	portStr := ":" + strconv.Itoa(w.serverParams.port)
 	if err := w.E.Start(portStr); err != nil {
 		fmt.Println("Error starting server:", err)
@@ -133,6 +136,11 @@ func (w *WebApp) pollApi() error {
 		fmt.Println("Error fetching tickets:", err)
 		return err
 	}
+	// Set last successful API check time
+	w.lastApiCheckMutex.Lock()
+	w.lastApiCheckTime = time.Now()
+	w.lastApiCheckMutex.Unlock()
+
 	if w.serverParams.verboseApi {
 		timeStamp := time.Now().Format("15:04 Jan 2")
 		fmt.Printf("\n[%v] fresh tickets obtained. Fresh open ticket count: %v", timeStamp, len(freshTickets))
@@ -175,6 +183,42 @@ type Template struct {
 
 func (t *Template) Render(w io.Writer, name string, data interface{}, c echo.Context) error {
 	return t.templates.ExecuteTemplate(w, name, data)
+}
+
+// Status message struct for websocket broadcast
+type StatusMessage struct {
+	Type           string    `json:"type"`
+	LastApiCheck   string    `json:"lastApiCheck"`
+	ActiveHours    bool      `json:"activeHours"`
+}
+
+// Broadcast status to all WebSocket clients every 10 minutes
+func (w *WebApp) periodicStatusBroadcast() {
+	ticker := time.NewTicker(10 * time.Minute)
+	defer ticker.Stop()
+	for {
+		<-ticker.C
+		w.broadcastStatus()
+	}
+}
+func (w *WebApp) broadcastStatus() {
+	w.lastApiCheckMutex.RLock()
+	lastCheck := w.lastApiCheckTime
+	w.lastApiCheckMutex.RUnlock()
+	currentHour := time.Now().Hour()
+	w.serverParams.RLock()
+	active := currentHour >= w.serverParams.apiStartHour && currentHour < w.serverParams.apiEndHour
+	w.serverParams.RUnlock()
+	msg := StatusMessage{
+		Type:         "status",
+		LastApiCheck: lastCheck.Format(time.RFC3339),
+		ActiveHours:  active,
+	}
+	w.wsClients.Lock()
+	defer w.wsClients.Unlock()
+	for c := range w.wsClients.clients {
+		_ = c.WriteJSON(msg)
+	}
 }
 
 // func (w *WebApp) getRescIdCount() map[string]int {

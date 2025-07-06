@@ -86,17 +86,30 @@
         }
       };
       ws.onmessage = (event) => {
-          tickets = JSON.parse(event.data);
-          renderTable(tickets);
-          let newestCreateDate = '';
-          if (tickets.length > 0) {
-            newestCreateDate = tickets.reduce((max, t) => (t.createDate > max ? t.createDate : max), tickets[0].createDate);
-          }
-          if (newestCreateDate && lastNewestCreateDate && newestCreateDate > lastNewestCreateDate) {
-            blinkBackground(15);
-          }
-          if (newestCreateDate) {
-            lastNewestCreateDate = newestCreateDate;
+          try {
+            const data = JSON.parse(event.data);
+            if (Array.isArray(data)) {
+              // Ticket array
+              tickets = data;
+              renderTable(tickets);
+              let newestCreateDate = '';
+              if (tickets.length > 0) {
+                newestCreateDate = tickets.reduce((max, t) => (t.createDate > max ? t.createDate : max), tickets[0].createDate);
+              }
+              if (newestCreateDate && lastNewestCreateDate && newestCreateDate > lastNewestCreateDate) {
+                blinkBackground(15);
+              }
+              if (newestCreateDate) {
+                lastNewestCreateDate = newestCreateDate;
+              }
+            } else if (data.type === 'status') {
+              // Status message from server
+              console.log('[Server Status]', 'Last API Check:', data.lastApiCheck, 'Active Hours:', data.activeHours);
+            }
+          } catch (e) {
+            // fallback for legacy messages
+            tickets = JSON.parse(event.data);
+            renderTable(tickets);
           }
       };
       ws.onclose = function() {
