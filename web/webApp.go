@@ -24,18 +24,11 @@ type WebApp struct {
 	Tc           tickets.TicketCollection
 	wsClients    wsClients
 	serverParams serverParams
+	lastGoodApi  apiStatus
 }
 
-// adjustable parameters for webserver function
-type serverParams struct {
-	sync.RWMutex
-	pollRate     int
-	port         int
-	verboseApi   bool
-	apiStartHour int
-	apiEndHour   int
-}
-
+// embeds html files in compiled executable
+//
 //go:embed templates/*.html
 var templateFS embed.FS
 
@@ -92,6 +85,7 @@ func NewWebApp(
 // Starts serving clients and periodically polling API / updating websock clients
 func (w *WebApp) Start() {
 	go w.periodicallyPollApi()
+	go w.periodicallyBroadcastStatus()
 	portStr := ":" + strconv.Itoa(w.serverParams.port)
 	if err := w.E.Start(portStr); err != nil {
 		fmt.Println("Error starting server:", err)
@@ -104,8 +98,7 @@ func (w *WebApp) periodicallyPollApi() {
 	defer ticker.Stop()
 
 	for range ticker.C {
-		currentHour := time.Now().Hour()
-		if currentHour < w.serverParams.apiStartHour || currentHour >= w.serverParams.apiEndHour {
+		if !w.serverParams.getActive() {
 			if w.serverParams.verboseApi {
 				timeStamp := time.Now().Format("15:04 Jan 2")
 				fmt.Printf(
@@ -133,6 +126,9 @@ func (w *WebApp) pollApi() error {
 		fmt.Println("Error fetching tickets:", err)
 		return err
 	}
+	// Set last successful API check time
+	w.lastGoodApi.setGood()
+
 	if w.serverParams.verboseApi {
 		timeStamp := time.Now().Format("15:04 Jan 2")
 		fmt.Printf("\n[%v] fresh tickets obtained. Fresh open ticket count: %v", timeStamp, len(freshTickets))
@@ -160,6 +156,47 @@ func (w *WebApp) pollApi() error {
 
 //  helper types
 
+// server params
+// adjustable parameters for webserver function
+type serverParams struct {
+	sync.RWMutex
+	pollRate     int
+	port         int
+	verboseApi   bool
+	apiStartHour int
+	apiEndHour   int
+}
+
+func (sp *serverParams) getActive() bool {
+	sp.RLock()
+	defer sp.RUnlock()
+	currentHour := time.Now().Hour()
+	return !(currentHour < sp.apiStartHour || currentHour >= sp.apiEndHour)
+
+}
+
+// api status
+// mutex-protected timestamp of last good api call
+type apiStatus struct {
+	sync.RWMutex
+	time time.Time
+}
+
+// set the last good api time to now
+func (as *apiStatus) setGood() {
+	as.Lock()
+	defer as.Unlock()
+	as.time = time.Now()
+}
+
+// get time of last good api call
+func (as *apiStatus) getTime() time.Time {
+	as.RLock()
+	defer as.RUnlock()
+	return as.time
+}
+
+// submitted secrets
 // used to handle secrets submitted by user
 type submittedSecrets struct {
 	Username        string `json:"username"`
@@ -168,11 +205,13 @@ type submittedSecrets struct {
 	Password        string `json:"password"`
 }
 
+// templating
 // used for http templating
 type Template struct {
 	templates *template.Template
 }
 
+// satisfies echo Renderer interface
 func (t *Template) Render(w io.Writer, name string, data interface{}, c echo.Context) error {
 	return t.templates.ExecuteTemplate(w, name, data)
 }
