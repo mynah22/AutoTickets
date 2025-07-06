@@ -1,16 +1,32 @@
-name: Build and Release
+name: CI / CD
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "**" ]
+  pull_request:
+    branches: [ "**" ]
 
 jobs:
+
+  test:
+    name: Tests
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v4
+        with:
+          go-version: '1.24'
+      - name: Run Tests
+        run: go test -v ./...
+
+        
+
   build:
     name: Build and Release for All Platforms
     runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
 
     permissions:
-      contents: write  # Needed to create releases and upload assets
+      contents: write  
 
     steps:
     - name: Checkout code
@@ -24,10 +40,9 @@ jobs:
     - name: Determine next patch version
       id: version
       run: |
-        # Fetch tags
         git fetch --tags
 
-        # Get latest version tag matching pattern
+        # obtain latest version tag 
         LATEST_TAG=$(git tag --list 'v*.*.*' --sort=-v:refname | head -n 1)
 
         if [[ -z "$LATEST_TAG" ]]; then
