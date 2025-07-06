@@ -83,6 +83,7 @@
         <button onclick="copyExePath()" style="padding: 0.2em 0.8em;">Copy</button>
       </div>
     </div>
+    <div id="apiStaleMsg" style="display:none;color:#fff;background:#a00;text-align:center;font-size:1.1em;padding:0.7em 1em;margin:1em auto;border-radius:7px;max-width:500px;"></div>
     <table id="ticketsTable">
       <thead>
         <tr>
@@ -97,6 +98,7 @@
     </table>
   </div>
   <script>
+    let lastApiCheck = null;
     let tickets = [];
     let lastNewestCreateDate = '';
     let ws = null;
@@ -139,6 +141,7 @@
                 lastNewestCreateDate = newestCreateDate;
               }
             } else if (data.type === 'status') {
+              if (data.lastApiCheck) lastApiCheck = data.lastApiCheck;
               if (typeof data.isActive === 'boolean') {
                 setActiveState(data.isActive);
               }
@@ -334,13 +337,36 @@
       header.style.transition = '';
     }
 
+    function checkApiStale() {
+      const msgDiv = document.getElementById('apiStaleMsg');
+      if (!document.hidden && isActive && lastApiCheck) {
+        const last = new Date(lastApiCheck);
+        const now = new Date();
+        const diffMins = Math.floor((now - last) / 60000);
+        if (diffMins > 15) {
+          msgDiv.textContent = `API data is ${diffMins} minutes old! Check server logs.`;
+          msgDiv.style.display = '';
+          return;
+        }
+      }
+      msgDiv.style.display = 'none';
+    }
+
+
     setInterval(() => {
       renderTable(tickets);
     }, 30000);
 
+    setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        checkApiStale();
+      }
+    }, 300000); // 5 minutes
+
     document.addEventListener('visibilitychange', function() {
       if (document.visibilityState === 'visible') {
         connectWs();
+        checkApiStale();
       } else {
         disconnectWs();
       }

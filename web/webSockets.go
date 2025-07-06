@@ -89,7 +89,7 @@ type statusMessage struct {
 
 // Broadcast status to all WebSocket clients every 10 minutes
 func (w *WebApp) periodicallyBroadcastStatus() {
-	ticker := time.NewTicker(1 * time.Minute)
+	ticker := time.NewTicker(10 * time.Minute)
 	defer ticker.Stop()
 	for {
 		<-ticker.C
