@@ -211,36 +211,6 @@ func (t *Template) Render(w io.Writer, name string, data interface{}, c echo.Con
 	return t.templates.ExecuteTemplate(w, name, data)
 }
 
-// Status message struct for websocket broadcast
-type StatusMessage struct {
-	Type         string `json:"type"`
-	LastApiCheck string `json:"lastApiCheck"`
-	ActiveHours  bool   `json:"activeHours"`
-}
-
-// Broadcast status to all WebSocket clients every 10 minutes
-func (w *WebApp) periodicStatusBroadcast() {
-	ticker := time.NewTicker(1 * time.Minute)
-	defer ticker.Stop()
-	for {
-		<-ticker.C
-		w.broadcastStatus()
-	}
-}
-
-func (w *WebApp) broadcastStatus() {
-	msg := StatusMessage{
-		Type:         "status",
-		LastApiCheck: w.lastGoodApi.getTime().Format(time.RFC3339),
-		ActiveHours:  w.serverParams.getActive(),
-	}
-	w.wsClients.Lock()
-	defer w.wsClients.Unlock()
-	for c := range w.wsClients.clients {
-		_ = c.WriteJSON(msg)
-	}
-}
-
 // func (w *WebApp) getRescIdCount() map[string]int {
 // 	rescIdCount := make(map[string]int)
 // 	for _, ticket := range *w.Tc {

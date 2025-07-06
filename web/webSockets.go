@@ -3,6 +3,7 @@ package web
 import (
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/labstack/echo/v4"
@@ -26,8 +27,14 @@ func (w *WebApp) handleWsTickets(c echo.Context) error {
 	w.wsClients.Lock()
 	defer w.wsClients.Unlock()
 	w.wsClients.clients[conn] = true
-	err = conn.WriteJSON(w.Tc.GetUnassignedTickets())
-	if err != nil {
+
+	if !w.sendTicketMessage(conn) {
+		conn.Close()
+		delete(w.wsClients.clients, conn)
+		return nil
+	}
+
+	if !w.sendStatusMessage(conn) {
 		conn.Close()
 		delete(w.wsClients.clients, conn)
 		return nil
@@ -60,5 +67,50 @@ func (w *WebApp) broadcastTickets() {
 			c.Close()
 			delete(w.wsClients.clients, c)
 		}
+	}
+}
+
+func (w *WebApp) sendStatusMessage(c *websocket.Conn) bool {
+	msg := StatusMessage{
+		Type:         "status",
+		LastApiCheck: w.lastGoodApi.getTime().Format(time.RFC3339),
+		IsActive:     w.serverParams.getActive(),
+	}
+	if err := c.WriteJSON(msg); err != nil {
+		return false
+	}
+	return true
+}
+
+// Status message struct for websocket broadcast
+type StatusMessage struct {
+	Type         string `json:"type"`
+	LastApiCheck string `json:"lastApiCheck"`
+	IsActive     bool   `json:"isActive"`
+}
+
+// Broadcast status to all WebSocket clients every 10 minutes
+func (w *WebApp) periodicStatusBroadcast() {
+	ticker := time.NewTicker(1 * time.Minute)
+	defer ticker.Stop()
+	for {
+		<-ticker.C
+		w.broadcastStatus()
+	}
+}
+
+func (w *WebApp) sendTicketMessage(conn *websocket.Conn) bool {
+	err := conn.WriteJSON(w.Tc.GetUnassignedTickets())
+	if err != nil {
+		return false
+	}
+	return true
+}
+
+func (w *WebApp) broadcastStatus() {
+	w.wsClients.Lock()
+	defer w.wsClients.Unlock()
+	for c := range w.wsClients.clients {
+		w.sendStatusMessage(c)
 	}
 }
