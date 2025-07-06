@@ -4,6 +4,7 @@ import (
 	"autotaskViewer/api"
 	"autotaskViewer/secrets"
 	"autotaskViewer/tickets"
+	"embed"
 	"fmt"
 	"html/template"
 	"io"
@@ -16,6 +17,7 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 )
 
+// contains state of web server / application
 type WebApp struct {
 	E            *echo.Echo
 	Sc           secrets.SecretsCollection
@@ -24,6 +26,7 @@ type WebApp struct {
 	serverParams serverParams
 }
 
+// adjustable parameters for webserver function
 type serverParams struct {
 	sync.RWMutex
 	pollRate     int
@@ -32,6 +35,8 @@ type serverParams struct {
 	apiStartHour int
 	apiEndHour   int
 }
+
+var templateFS embed.FS
 
 // returns pointer to a properly initialized WebApp value
 func NewWebApp(
@@ -68,7 +73,7 @@ func NewWebApp(
 	}))
 
 	w.E.Renderer = &Template{
-		templates: template.Must(template.ParseGlob("templates/*.html")),
+		templates: template.Must(template.ParseFS(templateFS, "templates/*.html")),
 	}
 
 	w.E.GET("/", w.handleRoot)
