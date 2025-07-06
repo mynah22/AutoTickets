@@ -14,6 +14,7 @@
     .desc { font-size: 0.97em; color: #b9bbbe; }
     th.age-col { min-width: 120px; }
     h1 { text-align: center; }
+
     .hidden {
       display: none !important;
     }
@@ -38,7 +39,7 @@
     }
     #serverSleeping {
       background: #0a2342;
-      color: #fff;
+      color: #f1ca41;
       text-align: center;
       font-size: 1.2em;
       padding: 1em;
@@ -48,13 +49,23 @@
       letter-spacing: 0.5px;
     }
     .faded {
-      opacity: 0.35;
-      transition: opacity 1.2s cubic-bezier(0.4,0,0.2,1);
+      opacity: 0.125;
+      transition: opacity 10s cubic-bezier(0.4,0,0.2,1);
       pointer-events: none;
     }
     .unfaded {
-      opacity: 1;
-      transition: opacity 1.2s cubic-bezier(0.4,0,0.2,1);
+      opacity: var(--unfaded-opacity, 1);
+      transition: opacity 10s cubic-bezier(0.4,0,0.2,1);
+      pointer-events: auto;
+    }
+    h1.faded {
+      opacity: 0.125;
+      transition: opacity 10s cubic-bezier(0.4,0,0.2,1);
+      pointer-events: none;
+    }
+    h1.unfaded {
+      opacity: var(--unfaded-opacity, 1);
+      transition: opacity 10s cubic-bezier(0.4,0,0.2,1);
       pointer-events: auto;
     }
   </style>
@@ -63,7 +74,7 @@
   <div class="container">
     <h1><img src="favicon.ico" alt="favicon" style="height:1.2em;vertical-align:middle;margin-right:0.5em;">Unassigned Tickets <img src="favicon2.ico" alt="favicon2 icon" style="height:1.2em;vertical-align:middle;margin-right:0.5em;"></h1>
     <div id="serverMsg" style="text-align:center;"><i>server queries API every {{.ApiPollSecs}} seconds from 6AM - 6PM</i></div>
-    <div id="serverSleeping">Server is sleeping (outside active hours)</div>
+    <div id="serverSleeping"><i>🌙 Server is sleeping (outside active hours)</i></div>
     <div id="serverUnavailable" class="form-container hidden">
       Server not running</br>
       <i>please restart server by executing this file</i> </br>
@@ -89,6 +100,7 @@
     let tickets = [];
     let lastNewestCreateDate = '';
     let ws = null;
+    let fadeAnimationTimer = null;
     let blinkCount = 0;
     let blinkTimer = null;
     const SERVER_TIMEOUT_MS = 60 * 1000;
@@ -127,8 +139,6 @@
                 lastNewestCreateDate = newestCreateDate;
               }
             } else if (data.type === 'status') {
-              // Status message from server
-              console.log('[Server Status]', 'Last API Check:', data.lastApiCheck, 'Active Hours:', data.isActive);
               if (typeof data.isActive === 'boolean') {
                 setActiveState(data.isActive);
               }
@@ -143,8 +153,8 @@
         ws = null;
         document.getElementById('serverUnavailable').classList.remove('hidden');
         document.getElementById('serverMsg').style.display = 'none';
-        document.getElementById('serverSleeping').style.display = 'none';
         document.getElementById('ticketsTable').style.display = 'none';
+        setActiveState(true)
         wasServerDown = true;
         if (document.visibilityState === 'visible') {
           setTimeout(connectWs, 2000); 
@@ -254,16 +264,74 @@
       if (!active) {
         document.getElementById('serverSleeping').style.display = '';
         document.getElementById('serverMsg').style.display = 'none';
-        document.getElementById('ticketsTable').classList.add('faded');
-        document.getElementById('ticketsTable').classList.remove('unfaded');
+        startFadeAnimation();
         isActive = false;
       } else {
         document.getElementById('serverSleeping').style.display = 'none';
         document.getElementById('serverMsg').style.display = '';
-        document.getElementById('ticketsTable').classList.remove('faded');
-        document.getElementById('ticketsTable').classList.add('unfaded');
+        stopFadeAnimation();
         isActive = true;
       }
+    }
+
+    function startFadeAnimation() {
+      const table = document.getElementById('ticketsTable');
+      const header = document.querySelector('h1');
+      let faded = false;
+      if (fadeAnimationTimer) clearInterval(fadeAnimationTimer);
+      // Set lower unfaded opacity when inactive
+      table.style.setProperty('--unfaded-opacity', '0.5');
+      header.style.setProperty('--unfaded-opacity', '0.5');
+      table.classList.add('faded');
+      table.classList.remove('unfaded');
+      header.classList.add('faded');
+      header.classList.remove('unfaded');
+      faded = true;
+      fadeAnimationTimer = setInterval(() => {
+        if (isActive) {
+          stopFadeAnimation();
+          return;
+        }
+        faded = !faded;
+        if (faded) {
+          table.classList.add('faded');
+          table.classList.remove('unfaded');
+          header.classList.add('faded');
+          header.classList.remove('unfaded');
+        } else {
+          table.classList.remove('faded');
+          table.classList.add('unfaded');
+          header.classList.remove('faded');
+          header.classList.add('unfaded');
+        }
+      }, 10000); // 10 seconds per phase
+    }
+
+    function stopFadeAnimation() {
+      if (fadeAnimationTimer) {
+        clearInterval(fadeAnimationTimer);
+        fadeAnimationTimer = null;
+      }
+      const table = document.getElementById('ticketsTable');
+      const header = document.querySelector('h1');
+      // Temporarily override transition duration
+      table.style.transition = 'none';
+      header.style.transition = 'none';
+
+      table.style.setProperty('--unfaded-opacity', '1');
+      header.style.setProperty('--unfaded-opacity', '1');
+      table.classList.remove('faded');
+      table.classList.add('unfaded');
+      header.classList.remove('faded');
+      header.classList.add('unfaded');
+
+      // Force reflow to apply the style immediately
+      void table.offsetWidth;
+      void header.offsetWidth;
+
+      // Stop overriding transition
+      table.style.transition = '';
+      header.style.transition = '';
     }
 
     setInterval(() => {
