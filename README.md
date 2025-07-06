@@ -1,3 +1,4 @@
 # AutoTickets
 
-[![Build Status](https://github.com/mynah22/AutoTickets/actions/workflows/go.yml/badge.svg)](https://github.com/mynah22/AutoTickets/actions/workflows/go.yml)
+[![Tests](https://github.com/mynah22/AutoTickets/actions/workflows/test.yml/badge.svg)](https://github.com/mynah22/AutoTickets/actions/workflows/test.yml)
+[![Release](https://github.com/mynah22/AutoTickets/actions/workflows/release.yml/badge.svg)](https://github.com/mynah22/AutoTickets/actions/workflows/release.yml)
