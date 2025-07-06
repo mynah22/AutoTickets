@@ -37,7 +37,6 @@
       max-width: 350px;
     }
     #serverSleeping {
-      display: none;
       background: #0a2342;
       color: #fff;
       text-align: center;
@@ -63,7 +62,7 @@
 <body>
   <div class="container">
     <h1><img src="favicon.ico" alt="favicon" style="height:1.2em;vertical-align:middle;margin-right:0.5em;">Unassigned Tickets <img src="favicon2.ico" alt="favicon2 icon" style="height:1.2em;vertical-align:middle;margin-right:0.5em;"></h1>
-    <div id="serverMsg" style="text-align:center;"><i>server queries API every {{.ApiPollSecs}} seconds from 6PM - 6AM</i></div>
+    <div id="serverMsg" style="text-align:center;"><i>server queries API every {{.ApiPollSecs}} seconds from 6AM - 6PM</i></div>
     <div id="serverSleeping">Server is sleeping (outside active hours)</div>
     <div id="serverUnavailable" class="form-container hidden">
       Server not running</br>
@@ -103,6 +102,7 @@
       ws.onopen = () => {
         document.getElementById('serverUnavailable').classList.add('hidden');
         document.getElementById('serverMsg').style.display = '';
+        document.getElementById('serverSleeping').style.display = 'none';
         document.getElementById('ticketsTable').style.display = '';
         if (wasServerDown) {
           wasServerDown = false;
@@ -128,9 +128,9 @@
               }
             } else if (data.type === 'status') {
               // Status message from server
-              console.log('[Server Status]', 'Last API Check:', data.lastApiCheck, 'Active Hours:', data.activeHours);
-              if (typeof data.activeHours === 'boolean') {
-                setActiveState(data.activeHours);
+              console.log('[Server Status]', 'Last API Check:', data.lastApiCheck, 'Active Hours:', data.isActive);
+              if (typeof data.isActive === 'boolean') {
+                setActiveState(data.isActive);
               }
             }
           } catch (e) {
@@ -141,9 +141,10 @@
       };
       ws.onclose = function() {
         ws = null;
-        document.getElementById('serverMsg').style.display = 'none';
-        document.getElementById('ticketsTable').style.display = 'none';
         document.getElementById('serverUnavailable').classList.remove('hidden');
+        document.getElementById('serverMsg').style.display = 'none';
+        document.getElementById('serverSleeping').style.display = 'none';
+        document.getElementById('ticketsTable').style.display = 'none';
         wasServerDown = true;
         if (document.visibilityState === 'visible') {
           setTimeout(connectWs, 2000); 
@@ -192,6 +193,7 @@
         tbody.appendChild(tr);
       });
     }
+
     function blinkBackground(times) {
       if (blinkTimer) clearInterval(blinkTimer);
       blinkCount = 0;
@@ -249,17 +251,17 @@
     }
 
     function setActiveState(active) {
-      const sleepingDiv = document.getElementById('serverSleeping');
-      const table = document.getElementById('ticketsTable');
       if (!active) {
-        sleepingDiv.style.display = '';
-        table.classList.add('faded');
-        table.classList.remove('unfaded');
+        document.getElementById('serverSleeping').style.display = '';
+        document.getElementById('serverMsg').style.display = 'none';
+        document.getElementById('ticketsTable').classList.add('faded');
+        document.getElementById('ticketsTable').classList.remove('unfaded');
         isActive = false;
       } else {
-        sleepingDiv.style.display = 'none';
-        table.classList.remove('faded');
-        table.classList.add('unfaded');
+        document.getElementById('serverSleeping').style.display = 'none';
+        document.getElementById('serverMsg').style.display = '';
+        document.getElementById('ticketsTable').classList.remove('faded');
+        document.getElementById('ticketsTable').classList.add('unfaded');
         isActive = true;
       }
     }
