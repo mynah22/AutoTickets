@@ -9,13 +9,13 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-// used to safely iterate over websocket connections
+// used to thread-safely manage several websocket connections
 type wsClients struct {
 	sync.Mutex
 	clients map[*websocket.Conn]bool
 }
 
-// WebSocket handler for tickets information
+// WebSocket handler for new connections
 func (w *WebApp) handleWsTickets(c echo.Context) error {
 	upgrader := websocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool { return true },
@@ -25,37 +25,34 @@ func (w *WebApp) handleWsTickets(c echo.Context) error {
 		return err
 	}
 	w.wsClients.Lock()
-	defer w.wsClients.Unlock()
 	w.wsClients.clients[conn] = true
+	w.wsClients.Unlock()
 
-	if !w.sendTicketMessage(conn) {
-		conn.Close()
-		delete(w.wsClients.clients, conn)
-		return nil
+	sm := statusMessage{
+		Type:         "status",
+		LastApiCheck: w.lastGoodApi.getTime().Format(time.RFC3339),
+		IsActive:     w.serverParams.getActive(),
 	}
 
-	if !w.sendStatusMessage(conn) {
-		conn.Close()
-		delete(w.wsClients.clients, conn)
-		return nil
-	}
-
-	go func() {
-		for {
-			_, _, err := conn.ReadMessage()
-			if err != nil {
-				w.wsClients.Lock()
-				delete(w.wsClients.clients, conn)
-				w.wsClients.Unlock()
-				conn.Close()
-				break
+	// send ticket and status message. If both succeed, listen for incoming messages
+	// if incoming message has error, delete client from list and close connection
+	if w.sendTicketMessage(conn) && w.sendStatusMessage(conn, sm) {
+		go func() {
+			for {
+				_, _, err := conn.ReadMessage()
+				if err != nil {
+					w.wsClients.Lock()
+					delete(w.wsClients.clients, conn)
+					w.wsClients.Unlock()
+					conn.Close()
+					break
+				}
 			}
-		}
-	}()
+		}()
+	}
+
 	return nil
 }
-
-// Websocket Message Sending
 
 // Broadcast tickets to all WebSocket clients
 func (w *WebApp) broadcastTickets() {
@@ -70,27 +67,28 @@ func (w *WebApp) broadcastTickets() {
 	}
 }
 
-func (w *WebApp) sendStatusMessage(c *websocket.Conn) bool {
-	msg := StatusMessage{
-		Type:         "status",
-		LastApiCheck: w.lastGoodApi.getTime().Format(time.RFC3339),
-		IsActive:     w.serverParams.getActive(),
-	}
-	if err := c.WriteJSON(msg); err != nil {
+// send tickets to a single web socket client
+func (w *WebApp) sendTicketMessage(conn *websocket.Conn) bool {
+	err := conn.WriteJSON(w.Tc.GetUnassignedTickets())
+	if err != nil {
+		conn.Close()
+		delete(w.wsClients.clients, conn)
 		return false
 	}
 	return true
 }
 
+// status messages
+
 // Status message struct for websocket broadcast
-type StatusMessage struct {
+type statusMessage struct {
 	Type         string `json:"type"`
 	LastApiCheck string `json:"lastApiCheck"`
 	IsActive     bool   `json:"isActive"`
 }
 
 // Broadcast status to all WebSocket clients every 10 minutes
-func (w *WebApp) periodicStatusBroadcast() {
+func (w *WebApp) periodicallyBroadcastStatus() {
 	ticker := time.NewTicker(1 * time.Minute)
 	defer ticker.Stop()
 	for {
@@ -99,18 +97,26 @@ func (w *WebApp) periodicStatusBroadcast() {
 	}
 }
 
-func (w *WebApp) sendTicketMessage(conn *websocket.Conn) bool {
-	err := conn.WriteJSON(w.Tc.GetUnassignedTickets())
-	if err != nil {
+// broadcasts status to a single websocket clients
+func (w *WebApp) broadcastStatus() {
+	sm := statusMessage{
+		Type:         "status",
+		LastApiCheck: w.lastGoodApi.getTime().Format(time.RFC3339),
+		IsActive:     w.serverParams.getActive(),
+	}
+	w.wsClients.Lock()
+	defer w.wsClients.Unlock()
+	for conn := range w.wsClients.clients {
+		w.sendStatusMessage(conn, sm)
+	}
+}
+
+// sends status to a single websocket client
+func (w *WebApp) sendStatusMessage(conn *websocket.Conn, sm statusMessage) bool {
+	if err := conn.WriteJSON(sm); err != nil {
+		conn.Close()
+		delete(w.wsClients.clients, conn)
 		return false
 	}
 	return true
-}
-
-func (w *WebApp) broadcastStatus() {
-	w.wsClients.Lock()
-	defer w.wsClients.Unlock()
-	for c := range w.wsClients.clients {
-		w.sendStatusMessage(c)
-	}
 }

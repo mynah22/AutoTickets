@@ -85,7 +85,7 @@ func NewWebApp(
 // Starts serving clients and periodically polling API / updating websock clients
 func (w *WebApp) Start() {
 	go w.periodicallyPollApi()
-	go w.periodicStatusBroadcast()
+	go w.periodicallyBroadcastStatus()
 	portStr := ":" + strconv.Itoa(w.serverParams.port)
 	if err := w.E.Start(portStr); err != nil {
 		fmt.Println("Error starting server:", err)
@@ -156,6 +156,7 @@ func (w *WebApp) pollApi() error {
 
 //  helper types
 
+// server params
 // adjustable parameters for webserver function
 type serverParams struct {
 	sync.RWMutex
@@ -174,6 +175,7 @@ func (sp *serverParams) getActive() bool {
 
 }
 
+// api status
 // mutex-protected timestamp of last good api call
 type apiStatus struct {
 	sync.RWMutex
@@ -194,6 +196,7 @@ func (as *apiStatus) getTime() time.Time {
 	return as.time
 }
 
+// submitted secrets
 // used to handle secrets submitted by user
 type submittedSecrets struct {
 	Username        string `json:"username"`
@@ -202,11 +205,13 @@ type submittedSecrets struct {
 	Password        string `json:"password"`
 }
 
+// templating
 // used for http templating
 type Template struct {
 	templates *template.Template
 }
 
+// satisfies echo Renderer interface
 func (t *Template) Render(w io.Writer, name string, data interface{}, c echo.Context) error {
 	return t.templates.ExecuteTemplate(w, name, data)
 }
