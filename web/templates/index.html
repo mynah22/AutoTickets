@@ -36,12 +36,35 @@
       margin-right: auto;
       max-width: 350px;
     }
+    #serverSleeping {
+      display: none;
+      background: #0a2342;
+      color: #fff;
+      text-align: center;
+      font-size: 1.2em;
+      padding: 1em;
+      border-radius: 8px;
+      margin-bottom: 1em;
+      box-shadow: 0 2px 8px #0008;
+      letter-spacing: 0.5px;
+    }
+    .faded {
+      opacity: 0.35;
+      transition: opacity 1.2s cubic-bezier(0.4,0,0.2,1);
+      pointer-events: none;
+    }
+    .unfaded {
+      opacity: 1;
+      transition: opacity 1.2s cubic-bezier(0.4,0,0.2,1);
+      pointer-events: auto;
+    }
   </style>
 </head>
 <body>
   <div class="container">
     <h1><img src="favicon.ico" alt="favicon" style="height:1.2em;vertical-align:middle;margin-right:0.5em;">Unassigned Tickets <img src="favicon2.ico" alt="favicon2 icon" style="height:1.2em;vertical-align:middle;margin-right:0.5em;"></h1>
     <div id="serverMsg" style="text-align:center;"><i>server queries API every {{.ApiPollSecs}} seconds from 6PM - 6AM</i></div>
+    <div id="serverSleeping">Server is sleeping (outside active hours)</div>
     <div id="serverUnavailable" class="form-container hidden">
       Server not running</br>
       <i>please restart server by executing this file</i> </br>
@@ -72,6 +95,7 @@
     const SERVER_TIMEOUT_MS = 60 * 1000;
     let wsUrl = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/wsTickets';
     let wasServerDown = false;
+    let isActive = true;
 
     function connectWs() {
       if (ws) return;
@@ -105,6 +129,9 @@
             } else if (data.type === 'status') {
               // Status message from server
               console.log('[Server Status]', 'Last API Check:', data.lastApiCheck, 'Active Hours:', data.activeHours);
+              if (typeof data.activeHours === 'boolean') {
+                setActiveState(data.activeHours);
+              }
             }
           } catch (e) {
             // fallback for legacy messages
@@ -219,6 +246,22 @@
       setTimeout(() => {
         toast.style.opacity = 0;
       }, 1200);
+    }
+
+    function setActiveState(active) {
+      const sleepingDiv = document.getElementById('serverSleeping');
+      const table = document.getElementById('ticketsTable');
+      if (!active) {
+        sleepingDiv.style.display = '';
+        table.classList.add('faded');
+        table.classList.remove('unfaded');
+        isActive = false;
+      } else {
+        sleepingDiv.style.display = 'none';
+        table.classList.remove('faded');
+        table.classList.add('unfaded');
+        isActive = true;
+      }
     }
 
     setInterval(() => {
