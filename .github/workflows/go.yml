@@ -21,21 +21,43 @@ jobs:
       with:
         go-version: '1.24'
 
-    - name: Set release version
+    - name: Determine next patch version
       id: version
       run: |
-        VERSION="v$(date +'%Y.%m.%d.%H%M%S')"
-        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        # Fetch tags
+        git fetch --tags
+
+        # Get latest version tag matching pattern
+        LATEST_TAG=$(git tag --list 'v*.*.*' --sort=-v:refname | head -n 1)
+
+        if [[ -z "$LATEST_TAG" ]]; then
+          MAJOR=0
+          MINOR=1
+          PATCH=0
+        else
+          MAJOR=$(echo $LATEST_TAG | cut -d. -f1 | cut -dv -f2)
+          MINOR=$(echo $LATEST_TAG | cut -d. -f2)
+          PATCH=$(echo $LATEST_TAG | cut -d. -f3)
+          PATCH=$((PATCH + 1))
+        fi
+
+        NEW_TAG="v$MAJOR.$MINOR.$PATCH"
+        echo "New version: $NEW_TAG"
+        echo "version=$NEW_TAG" >> $GITHUB_OUTPUT
+
 
     - name: Build for Linux
       run: |
-        GOOS=linux GOARCH=amd64 go build -o myapp-linux
+        GOOS=linux GOARCH=amd64 go build -o AutoTickets-Linux
     - name: Build for Windows
       run: |
-        GOOS=windows GOARCH=amd64 go build -o myapp-windows.exe
-    - name: Build for macOS
+        GOOS=windows GOARCH=amd64 go build -o AutoTickets.exe
+    - name: Build for macOS (intel)
       run: |
-        GOOS=darwin GOARCH=amd64 go build -o myapp-macos
+        GOOS=darwin GOARCH=amd64 go build -o AutoTickets-Mac-Intel
+    - name: Build for macOS (arm)
+      run: |
+        GOOS=darwin GOARCH=arm64 go build -o AutoTickets-Mac-Arm
 
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v2
@@ -43,8 +65,17 @@ jobs:
         tag_name: ${{ steps.version.outputs.version }}
         name: Release ${{ steps.version.outputs.version }}
         files: |
-          myapp-linux
-          myapp-windows.exe
-          myapp-macos
+          AutoTickets-Linux
+          AutoTickets.exe
+          AutoTickets-Mac-Arm
+          AutoTickets-Mac-Intel
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Push new tag to Git
+      run: |
+        git config user.name "${{ github.actor }}"
+        git config user.email "${{ github.actor }}@users.noreply.github.com"
+        git tag ${{ steps.version.outputs.version }}
+        git push origin ${{ steps.version.outputs.version }}
+
