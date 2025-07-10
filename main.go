@@ -1,7 +1,7 @@
 package main
 
 import (
-	"autotaskViewer/web"
+	"AutoTickets/web"
 	"flag"
 	"fmt"
 	"time"

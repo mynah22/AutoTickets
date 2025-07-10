@@ -1,9 +1,9 @@
 package web
 
 import (
-	"autotaskViewer/api"
-	"autotaskViewer/secrets"
-	"autotaskViewer/tickets"
+	"AutoTickets/api"
+	"AutoTickets/secrets"
+	"AutoTickets/tickets"
 	"embed"
 	"fmt"
 	"html/template"

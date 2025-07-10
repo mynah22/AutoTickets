@@ -1,7 +1,7 @@
 package api
 
 import (
-	"autotaskViewer/tickets"
+	"AutoTickets/tickets"
 	"fmt"
 	"io"
 	"net/http"
