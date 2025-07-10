@@ -48,19 +48,19 @@ jobs:
     - name: Build for Linux
       run: |
         VERSION=${{ steps.version.outputs.version}}
-        GOOS=linux GOARCH=amd64 go build -ldflags="-X 'main.version=$VERSION'" -o AutoTickets-Linux 
+        GOOS=linux GOARCH=amd64 go build -ldflags="-X main.version=$VERSION" -o AutoTickets-Linux 
     - name: Build for Windows
       run: |
         VERSION=${{ steps.version.outputs.version}}
-        GOOS=windows GOARCH=amd64 go build -ldflags="-X 'main.version=$VERSION'" -o AutoTickets.exe
+        GOOS=windows GOARCH=amd64 go build -ldflags="-X main.version=$VERSION" -o AutoTickets.exe
     - name: Build for macOS (intel)
       run: |
         VERSION=${{ steps.version.outputs.version}}
-        GOOS=darwin GOARCH=amd64 go build -ldflags="-X 'main.version=$VERSION'" -o AutoTickets-Mac-Intel
+        GOOS=darwin GOARCH=amd64 go build -ldflags="-X main.version=$VERSION" -o AutoTickets-Mac-Intel
     - name: Build for macOS (arm)
       run: |
         VERSION=${{ steps.version.outputs.version}}
-        GOOS=darwin GOARCH=arm64 go build -ldflags="-X 'main.version=$VERSION'" -o AutoTickets-Mac-Arm
+        GOOS=darwin GOARCH=arm64 go build -ldflags="-X main.version=$VERSION" -o AutoTickets-Mac-Arm
 
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v2

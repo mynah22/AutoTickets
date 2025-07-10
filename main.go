@@ -7,13 +7,17 @@ import (
 	"time"
 )
 
-// default version string is dev-buildtime
-// overridden by github workflow release version
-var version string = "dev-" + time.Now().Format("15:04:05-Jan-02-2006")
+var version string
 
 func main() {
-	fmt.Printf(version)
+
 	validateFlags()
+
+	// default version string
+	// overridden by github workflow release version
+	if version == "" {
+		version = "dev-" + time.Now().Format("15:04:05-Jan-02-2006")
+	}
 
 	w := web.NewWebApp(
 		*logHttp,
