@@ -40,7 +40,8 @@ func NewWebApp(
 	saveFilePath string,
 	verboseApi bool,
 	apiStart int,
-	apiEnd int) (w *WebApp) {
+	apiEnd int,
+	versionStr string) (w *WebApp) {
 
 	ticketsSlice := make([]tickets.AutotaskTicket, 0)
 
@@ -55,6 +56,7 @@ func NewWebApp(
 			verboseApi:   verboseApi,
 			pollRate:     pollRate,
 			port:         port,
+			versionStr:   versionStr,
 		},
 	}
 
@@ -165,6 +167,7 @@ type serverParams struct {
 	verboseApi   bool
 	apiStartHour int
 	apiEndHour   int
+	versionStr   string
 }
 
 func (sp *serverParams) getActive() bool {

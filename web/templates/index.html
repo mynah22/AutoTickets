@@ -97,6 +97,9 @@
       </tbody>
     </table>
   </div>
+  <div style="position: fixed; bottom: 12px; right: 24px; color: #ccc; font-size: 1.05em; z-index: 1000; pointer-events: none;">
+    <i>{{.Version}}</i>
+  </div>
   <script>
     let lastApiCheck = null;
     let tickets = [];
@@ -236,6 +239,7 @@
       }
       showToast('Copied!');
     }
+
     function showToast(msg) {
       let toast = document.getElementById('copyToast');
       if (!toast) {
@@ -375,6 +379,8 @@
       connectWs();
     }
   </script>
+  <div style="position: fixed; bottom: 12px; right: 24px; color: #ccc; font-size: 1.05em; z-index: 1000; pointer-events: none;">
+  <i>{{.Version}}</i>
 </body>
 </html>
 {{end}}

@@ -4,10 +4,15 @@ import (
 	"autotaskViewer/web"
 	"flag"
 	"fmt"
+	"time"
 )
 
-func main() {
+// default version string is dev-buildtime
+// overridden by github workflow release version
+var version string = "dev-" + time.Now().Format("15:04:05-Jan-02-2006")
 
+func main() {
+	fmt.Printf(version)
 	validateFlags()
 
 	w := web.NewWebApp(
@@ -17,7 +22,9 @@ func main() {
 		*saveFilePath,
 		*verboseApi,
 		*apiStart,
-		*apiEnd)
+		*apiEnd,
+		version,
+	)
 
 	w.Start()
 

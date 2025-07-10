@@ -11,6 +11,7 @@ import (
 type serverInfo struct {
 	ApiPollSecs    int
 	ExecutablePath string
+	Version        string
 }
 
 //  Route Handlers
@@ -24,21 +25,25 @@ func (w *WebApp) handleRoot(c echo.Context) error {
 	if err != nil {
 		executablePath = "File path not determined"
 	}
-	serverInfo := serverInfo{
+	si := serverInfo{
 		ApiPollSecs:    w.serverParams.pollRate,
 		ExecutablePath: executablePath,
+		Version:        w.serverParams.versionStr,
 	}
-	return c.Render(http.StatusOK, "index.html", serverInfo)
+	return c.Render(http.StatusOK, "index.html", si)
 }
 
 // directs user to unlock secrets if encrypted secrets are resent, otherwise directs user to submit secrets
 func (w *WebApp) handleSecrets(c echo.Context) error {
 
 	if !w.Sc.SecretsAreLoaded() {
-		if w.Sc.EncFilePresent() {
-			return c.Render(http.StatusOK, "unlockSecrets.html", nil)
+		si := serverInfo{
+			Version: w.serverParams.versionStr,
 		}
-		return c.Render(http.StatusOK, "enterSecrets.html", nil)
+		if w.Sc.EncFilePresent() {
+			return c.Render(http.StatusOK, "unlockSecrets.html", si)
+		}
+		return c.Render(http.StatusOK, "enterSecrets.html", si)
 	}
 	return c.Redirect(http.StatusSeeOther, "/")
 }
