@@ -113,6 +113,8 @@
     let wasServerDown = false;
     let isActive = true;
 
+    const notifySound = new Audio('alert.wav');
+
     function connectWs() {
       if (ws) return;
       ws = new WebSocket(wsUrl);
@@ -215,6 +217,7 @@
       blinkCount = 0;
       const body = document.body;
       let on = false;
+      try { notifySound.currentTime = 0; notifySound.play(); } catch (e) {}
       blinkTimer = setInterval(() => {
         if (blinkCount >= times * 2) {
           body.style.background = '#181a1b';
