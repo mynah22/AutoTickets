@@ -97,7 +97,7 @@ func (w *WebApp) periodicallyBroadcastStatus() {
 	}
 }
 
-// broadcasts status to a single websocket clients
+// broadcasts status to a single websocket client
 func (w *WebApp) broadcastStatus() {
 	sm := statusMessage{
 		Type:         "status",
