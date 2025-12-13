@@ -79,7 +79,7 @@
       Server not running</br>
       <i>please restart server by executing this file</i> </br>
       <div style="display: flex; align-items: center; justify-content: center; gap: 0.5em; margin-top: 0.5em;">
-        <input id="exePathBox" type="text" value={{.ExecutablePath}} readonly style="width: 260px; background: #222; color: #fff; border: 1px solid #555; border-radius: 3px; padding: 0.2em 0.5em; font-family: monospace;" />
+        <input id="exePathBox" type="text" value="{{.ExecutablePath}}" readonly style="width: 260px; background: #222; color: #fff; border: 1px solid #555; border-radius: 3px; padding: 0.2em 0.5em; font-family: monospace;" />
         <button onclick="copyExePath()" style="padding: 0.2em 0.8em;">Copy</button>
       </div>
     </div>
@@ -114,6 +114,43 @@
     let isActive = true;
 
     const notifySound = new Audio('alert.wav');
+
+    // Build a PowerShell-friendly launch command from the executable path rendered by Go:
+    // Input `{{.ExecutablePath}}` is expected as e.g. C:/full/path/to/exe.exe or C:\full\path\to\exe.exe
+    // This function converts it into: cd "C:/full/path/to"; & "exename.exe"
+    function buildExeCommand() {
+      const exeBox = document.getElementById('exePathBox');
+      if (!exeBox) return;
+      let raw = exeBox.value || '';
+      if (!raw) return;
+      // Store original raw path in data-raw (in case it's useful)
+      exeBox.dataset.raw = raw;
+
+      // Normalize backslashes to forward slashes for consistent splitting
+      raw = raw.replace(/\\/g, '/').trim();
+
+      // If the path is wrapped in quotes already, strip them
+      if ((raw.startsWith('"') && raw.endsWith('"')) || (raw.startsWith("'") && raw.endsWith("'"))) {
+        raw = raw.slice(1, -1);
+      }
+
+      const parts = raw.split('/');
+      const exe = parts.pop() || '';
+      const dir = parts.join('/') || '';
+
+      const esc = (s) => s.replace(/"/g, '\\"');
+
+      let cmd;
+      if (dir) {
+        cmd = `cd "${esc(dir)}"; & "${esc(exe)}"`;
+      } else {
+        // If no directory found, just run the exe (still quoted)
+        cmd = `& "${esc(exe)}"`;
+      }
+
+      exeBox.value = cmd;
+      exeBox.title = cmd;
+    }
 
     function connectWs() {
       if (ws) return;
@@ -381,6 +418,10 @@
     if (document.visibilityState === 'visible') {
       connectWs();
     }
+
+    // Ensure the exe input shows the PS command immediately on load
+    try { buildExeCommand(); } catch (e) {}
+    document.addEventListener('DOMContentLoaded', buildExeCommand);
   </script>
   <div style="position: fixed; bottom: 12px; right: 24px; color: #ccc; font-size: 1.05em; z-index: 1000; pointer-events: none;">
   <i>{{.Version}}</i>
