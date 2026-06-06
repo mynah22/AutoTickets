@@ -79,6 +79,10 @@ jobs:
   github-release:
     needs: [build-binaries, increment-version-tag]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
     steps:
       - uses: actions/checkout@v4
       
@@ -154,6 +158,6 @@ jobs:
           tags: |
             ghcr.io/${{ steps.repo.outputs.name }}:${{ needs.increment-version-tag.outputs.version }}
             ghcr.io/${{ steps.repo.outputs.name }}:latest
-            ${{ steps.ecr-login.outputs.registry }}/autotickets:${{ needs.increment-version-tag.outputs.version }}
-            ${{ steps.ecr-login.outputs.registry }}/autotickets:latest
+            ${{ steps.ecr-login.outputs.registry }}/github/autotickets:${{ needs.increment-version-tag.outputs.version }}
+            ${{ steps.ecr-login.outputs.registry }}/github/autotickets:latest
 
