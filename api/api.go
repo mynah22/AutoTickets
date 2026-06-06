@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/tidwall/gjson"
 )
@@ -38,17 +39,23 @@ func GetOpenTickets(apiIntegrationCode, apiSecret, apiUsername string) ([]ticket
 
 	var openTickets []tickets.AutotaskTicket
 	jsonStr := string(body)
-	gjson.Get(jsonStr, "items").
-		ForEach(func(_, t gjson.Result) bool {
-			openTickets = append(openTickets, tickets.AutotaskTicket{
-				ID:                 t.Get("id").Int(),
-				AssignedResourceID: t.Get("assignedResourceID").String(),
-				CreateDate:         t.Get("createDate").String(),
-				Description:        t.Get("description").String(),
-				Title:              t.Get("title").String(),
-			})
-			return true
-		})
+	gjson.Get(jsonStr, "items").ForEach(func(_, t gjson.Result) bool {
+		ticket := tickets.AutotaskTicket{
+			ID:                 t.Get("id").Int(),
+			AssignedResourceID: t.Get("assignedResourceID").String(),
+			CreateDate:         t.Get("createDate").String(),
+			Description:        t.Get("description").String(),
+			Title:              t.Get("title").String(),
+		}
+
+		if strings.Contains(strings.ToLower(ticket.Title), "term") {
+			ticket.Title = "Sensitive - view on web"
+			ticket.Description = "Details of this ticket can be found on autotask.net"
+		}
+
+		openTickets = append(openTickets, ticket)
+		return true
+	})
 
 	return openTickets, nil
 }
