@@ -122,6 +122,9 @@ jobs:
           name: dist
           path: dist/
 
+      - name: check dist contents (debug)
+        run: ls -la dist/
+
       - name: login to GHCR
         uses: docker/login-action@v3
         with:
