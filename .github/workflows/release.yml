@@ -108,10 +108,12 @@ jobs:
           git tag ${{ needs.increment-version-tag.outputs.version }}
           git push origin ${{ needs.increment-version-tag.outputs.version }}
 
-
   build-and-publish-image:
     needs: [build-binaries, increment-version-tag]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     
     steps:
       - uses: actions/checkout@v4
