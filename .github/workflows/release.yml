@@ -2,24 +2,20 @@ name: Build and Release
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "feat-dockerize" ]
 
 jobs:
-  build:
-    name: Build and Release for All Platforms
-    runs-on: ubuntu-latest
 
-    permissions:
-      contents: write  
+  increment-version-tag:
+    name: increment the patch number in version tag
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
 
     steps:
+
     - name: Checkout code
       uses: actions/checkout@v4
-
-    - name: Set up Go
-      uses: actions/setup-go@v4
-      with:
-        go-version: '1.24'
 
     - name: Determine next patch version
       id: version
@@ -44,41 +40,124 @@ jobs:
         echo "New version: $NEW_TAG"
         echo "version=$NEW_TAG" >> $GITHUB_OUTPUT
 
+  build-binaries:
+    needs: increment-version-tag
+    name: Build and Release for All Platforms
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write  
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.24'
 
     - name: Build for Linux
       run: |
-        VERSION=${{ steps.version.outputs.version}}
-        GOOS=linux GOARCH=amd64 go build -ldflags="-X main.version=$VERSION" -o AutoTickets-Linux 
+        GOOS=linux GOARCH=amd64 go build -ldflags="-X main.version=${{ needs.increment-version-tag.outputs.version }}" -o dist/AutoTickets-Linux 
     - name: Build for Windows
       run: |
-        VERSION=${{ steps.version.outputs.version}}
-        GOOS=windows GOARCH=amd64 go build -ldflags="-X main.version=$VERSION" -o AutoTickets.exe
+        GOOS=windows GOARCH=amd64 go build -ldflags="-X main.version=${{ needs.increment-version-tag.outputs.version }}" -o dist/AutoTickets.exe
     - name: Build for macOS (intel)
       run: |
-        VERSION=${{ steps.version.outputs.version}}
-        GOOS=darwin GOARCH=amd64 go build -ldflags="-X main.version=$VERSION" -o AutoTickets-Mac-Intel
+        GOOS=darwin GOARCH=amd64 go build -ldflags="-X main.version=${{ needs.increment-version-tag.outputs.version }}" -o dist/AutoTickets-Mac-Intel
     - name: Build for macOS (arm)
       run: |
-        VERSION=${{ steps.version.outputs.version}}
-        GOOS=darwin GOARCH=arm64 go build -ldflags="-X main.version=$VERSION" -o AutoTickets-Mac-Arm
-
-    - name: Create GitHub Release
-      uses: softprops/action-gh-release@v2
+        GOOS=darwin GOARCH=arm64 go build -ldflags="-X main.version=${{ needs.increment-version-tag.outputs.version }}" -o dist/AutoTickets-Mac-Arm
+   
+    - name: upload dist
+      uses: actions/upload-artifact@v4
       with:
-        tag_name: ${{ steps.version.outputs.version }}
-        name: Release ${{ steps.version.outputs.version }}
-        files: |
-          AutoTickets-Linux
-          AutoTickets.exe
-          AutoTickets-Mac-Arm
-          AutoTickets-Mac-Intel
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        
-    - name: Push new tag to Git
-      run: |
-        git config user.name "${{ github.actor }}"
-        git config user.email "${{ github.actor }}@users.noreply.github.com"
-        git tag ${{ steps.version.outputs.version }}
-        git push origin ${{ steps.version.outputs.version }}
+        name: dist
+        path: dist/
+
+  github-release:
+    needs: [build-binaries, increment-version-tag]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: download dist
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.increment-version-tag.outputs.version }}
+          name: Release ${{ needs.increment-version-tag.outputs.version }}
+          files: |
+            dist/AutoTickets-Linux
+            dist/AutoTickets.exe
+            dist/AutoTickets-Mac-Arm
+            dist/AutoTickets-Mac-Intel
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Push new tag to Git
+        run: |
+          git config user.name "${{ github.repository_owner }}"
+          git config user.email "${{ github.repository_owner }}@users.noreply.github.com"
+          git tag ${{ needs.increment-version-tag.outputs.version }}
+          git push origin ${{ needs.increment-version-tag.outputs.version }}
+
+  build-and-publish-image:
+    needs: [build-binaries, increment-version-tag]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: download dist
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: login to GHCR
+        uses: docker/login-action@v3
+        with:
+            registry: ghcr.io
+            username: ${{ github.repository_owner }}
+            password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: login to ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Lowercase repository name
+        id: repo
+        run: echo "name=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+
+      - name: build and publish image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/${{ steps.repo.outputs.name }}:${{ needs.increment-version-tag.outputs.version }}
+            ghcr.io/${{ steps.repo.outputs.name }}:latest
+            ${{ steps.ecr-login.outputs.registry }}/github/autotickets:${{ needs.increment-version-tag.outputs.version }}
+            ${{ steps.ecr-login.outputs.registry }}/github/autotickets:latest
 
