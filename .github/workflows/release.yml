@@ -147,7 +147,7 @@ jobs:
         uses: aws-actions/amazon-ecr-login@v2
 
       - name: Lowercase repository name
-        id: repo
+        id: lowercase-repo-name
         run: echo "name=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
 
       - name: build and publish image
@@ -156,8 +156,8 @@ jobs:
           context: .
           push: true
           tags: |
-            ghcr.io/${{ steps.repo.outputs.name }}:${{ needs.increment-version-tag.outputs.version }}
-            ghcr.io/${{ steps.repo.outputs.name }}:latest
+            ghcr.io/${{ steps.lowercase-repo-name.outputs.name }}:${{ needs.increment-version-tag.outputs.version }}
+            ghcr.io/${{ steps.lowercase-repo-name.outputs.name }}:latest
             ${{ steps.ecr-login.outputs.registry }}/github/autotickets:${{ needs.increment-version-tag.outputs.version }}
             ${{ steps.ecr-login.outputs.registry }}/github/autotickets:latest
 
