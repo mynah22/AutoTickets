@@ -59,7 +59,7 @@ jobs:
 
     - name: Build for Linux
       run: |
-        GOOS=linux GOARCH=amd64 go build -ldflags="-X main.version=${{ needs.increment-version-tag.outputs.version }}" -o dist/AutoTickets-Linux 
+        CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-X main.version=${{ needs.increment-version-tag.outputs.version }}" -o dist/AutoTickets-Linux 
     - name: Build for Windows
       run: |
         GOOS=windows GOARCH=amd64 go build -ldflags="-X main.version=${{ needs.increment-version-tag.outputs.version }}" -o dist/AutoTickets.exe
