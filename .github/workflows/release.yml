@@ -42,7 +42,7 @@ jobs:
 
   build-binaries:
     needs: increment-version-tag
-    name: Build and Release for All Platforms
+    name: Compile for All Platforms
     runs-on: ubuntu-latest
 
     permissions:
@@ -78,6 +78,7 @@ jobs:
 
   github-release:
     needs: [build-binaries, increment-version-tag]
+    name: create github release
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -112,8 +113,9 @@ jobs:
           git tag ${{ needs.increment-version-tag.outputs.version }}
           git push origin ${{ needs.increment-version-tag.outputs.version }}
 
-  build-and-publish-image:
+  build-and-publish-container-image:
     needs: [build-binaries, increment-version-tag]
+    name: build and publish container image
     runs-on: ubuntu-latest
     permissions:
       contents: read
