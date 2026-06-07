@@ -30,3 +30,4 @@ go.work.sum
 secrets.gob
 static/*
 autotaskViewer
+/dist
