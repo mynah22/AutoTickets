@@ -11,15 +11,28 @@ import (
 
 var version string
 
+func init() {
+	if version == "" {
+		version = buildTimeVersion()
+	}
+}
+
+func buildTimeVersion() string {
+	exePath, err := os.Executable()
+	if err == nil {
+		if info, err := os.Stat(exePath); err == nil {
+			return "dev-" + info.ModTime().Format("15:04:05-Jan-02-2006")
+		}
+	}
+	return "dev-" + time.Now().Format("15:04:05-Jan-02-2006")
+}
+
 func main() {
 
 	validateFlags()
 
-	// default version string
-	// overridden by github workflow release version
-	if version == "" {
-		version = "dev-" + time.Now().Format("15:04:05-Jan-02-2006")
-	}
+	// version is initialized from the executable build timestamp, or overridden
+	// by release ldflags when building releases.
 
 	w := web.NewWebApp(
 		*logHttp,
