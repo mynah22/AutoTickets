@@ -4,4 +4,4 @@ RUN chmod +x /autotickets
 
 FROM gcr.io/distroless/static-debian12
 COPY --from=builder /autotickets /autotickets
-ENTRYPOINT ["/autotickets", "-port", "80"]
+ENTRYPOINT ["/autotickets"]
