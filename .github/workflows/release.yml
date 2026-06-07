@@ -2,7 +2,7 @@ name: Build and Release
 
 on:
   push:
-    branches: [ "feat-dockerize" ]
+    branches: [ "main" ]
 
 jobs:
 
